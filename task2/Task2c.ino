@@ -1,0 +1,72 @@
+// Motor 
+const int IN1 = 17;
+const int IN2 = 5;
+const int PWM_PIN = 16; 
+// Encoder pins
+const int encoderA= 12;
+const int encoderB= 13;
+// setup
+volatile int encoderCount = 0; // Counts encoder pulses
+const int pulsesPerRevolution = 235; // 
+// Speed setup
+const float targetRPM = 150.0;
+const int basePWM = (150.0 / 280.0) * 255; 
+const float Kp = 1.0; 
+int lastEncoderCount = 0;
+void IRAM_ATTR onEncoderA() {
+ if (digitalRead(encoderB) == LOW) {
+   encoderCount++; 
+ } else {
+   encoderCount--; 
+ }
+}
+// Set motor speed
+void setMotor(int speed) {
+ digitalWrite(IN1, HIGH); 
+ digitalWrite(IN2, LOW);
+ if (speed < 0) speed = 0;
+ if (speed > 255) speed = 255; 
+ analogWrite(PWM_PIN, speed);
+}
+
+// Get current RPM
+float getRPM() {
+ int pulses = encoderCount - lastEncoderCount; 
+ lastEncoderCount = encoderCount; 
+ float rpm = (pulses * 600.0) / pulsesPerRevolution; 
+ return rpm;
+}
+
+void setup() {
+ Serial.begin(115200); 
+ // Setup motor pins
+ pinMode(IN1, OUTPUT);
+ pinMode(IN2, OUTPUT);
+ pinMode(PWM_PIN, OUTPUT);
+ // Setup encoder pins
+ pinMode(encoderA, INPUT_PULLUP);
+ pinMode(encoderB, INPUT_PULLUP);
+ attachInterrupt(digitalPinToInterrupt(encoderA), onEncoderA, RISING);
+ // Start with motor off
+ digitalWrite(IN1, LOW);
+ digitalWrite(IN2, LOW);
+ analogWrite(PWM_PIN, 0);
+}
+void loop() {
+ // Get current speed
+ float currentRPM = getRPM();
+ // Calculate speed difference
+ float error = targetRPM - currentRPM;
+ // Adjust speed with PID (only Kp)
+ int speedAdjust = Kp * error;
+ // Final speed = base + adjustment
+ int finalSpeed = basePWM + speedAdjust;
+ // Set motor speed
+ setMotor(finalSpeed);
+ // Show speed
+ Serial.print("Target RPM: ");
+ Serial.print(targetRPM);
+ Serial.print(" Current RPM: ");
+ Serial.println(currentRPM);
+ delay(100); // Check every 0.1 second
+}
